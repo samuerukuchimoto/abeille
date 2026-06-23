@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { cosineSim } from '@/lib/embed'
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/email'
 
 const TEST_MODE = process.env.TEST_MODE === 'true'
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,19 +83,14 @@ export async function POST(req: NextRequest) {
         .eq('requester_email', normalEmail)
         .eq('target_message_id', target_message_id)
 
-      const toEmail = TEST_MODE
-        ? process.env.RESEND_TEST_EMAIL!
-        : target.email
-
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL!,
-        to: toEmail,
+      await sendEmail({
+        to: TEST_MODE ? process.env.GMAIL_USER! : target.email,
         subject: 'Someone wants to connect on Abeille',
         text: [
           'Someone saw your message and wants to connect.',
           '',
           'Their message:',
-          requesterMsg?.body ?? 'They haven\'t posted a message yet.',
+          requesterMsg?.body ?? "They haven't posted a message yet.",
           '',
           'Their email:',
           normalEmail,
