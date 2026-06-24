@@ -19,20 +19,25 @@ export async function POST(req: NextRequest) {
     const normalEmail = requester_email.toLowerCase().trim()
 
     // Rate limit: one connection per 24h per email
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { data: recent } = await supabaseAdmin
-      .from('connections')
-      .select('created_at')
-      .eq('requester_email', normalEmail)
-      .gt('created_at', since)
-      .limit(1)
-      .maybeSingle()
+    // Skipped in TEST_MODE so you can test repeatedly without waiting
+    if (!TEST_MODE) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: recent } = await supabaseAdmin
+        .from('connections')
+        .select('created_at')
+        .eq('requester_email', normalEmail)
+        .gt('created_at', since)
+        .limit(1)
+        .maybeSingle()
 
-    if (recent) {
-      return NextResponse.json(
-        { error: 'One connection per 24 hours. Come back tomorrow.' },
-        { status: 429 }
-      )
+      if (recent) {
+        return NextResponse.json(
+          { error: 'One connection per 24 hours. Come back tomorrow.' },
+          { status: 429 }
+        )
+      }
+    } else {
+      console.log('[abeille] TEST_MODE: skipping 24h connection rate limit for', normalEmail)
     }
 
     // Fetch target message
@@ -60,8 +65,10 @@ export async function POST(req: NextRequest) {
       .gt('expires_at', new Date().toISOString())
       .maybeSingle()
 
-    // If requester has no message, short-circuit before scoring
-    if (!requesterMsg) {
+    // If requester has no message:
+    // - Production: block and ask them to post first
+    // - TEST_MODE: proceed anyway so the email flow is testable
+    if (!requesterMsg && !TEST_MODE) {
       await supabaseAdmin.from('connections').insert({
         requester_email: normalEmail,
         requester_message_id: null,
@@ -77,14 +84,19 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (!requesterMsg && TEST_MODE) {
+      console.log('[abeille] TEST_MODE: requester has no active message, proceeding anyway')
+    }
+
     // Compute match score
     let finalScore: number
 
-    if (requesterMsg.embedding && target.embedding) {
+    if (requesterMsg?.embedding && target.embedding) {
       const score = cosineSim(requesterMsg.embedding, target.embedding)
       const bonus = requesterMsg.type !== target.type ? 0.08 : -0.05
       finalScore = score + bonus
     } else {
+      // No embeddings to compare (TEST_MODE with stub or no requester message)
       finalScore = 0.40
     }
 
@@ -93,18 +105,15 @@ export async function POST(req: NextRequest) {
     // Store connection attempt
     await supabaseAdmin.from('connections').insert({
       requester_email: normalEmail,
-      requester_message_id: requesterMsg.id,
+      requester_message_id: requesterMsg?.id ?? null,
       target_message_id,
       match_score: finalScore,
       status: TEST_MODE || finalScore >= 0.52 ? 'accepted' : 'pending',
     })
 
-    // Branch on score
-    // TEST_MODE bypasses threshold so the full flow is testable with stub embeddings
+    // In TEST_MODE, always connect regardless of score
     if (TEST_MODE || finalScore >= 0.52) {
       try {
-        // Always send to real target email — TEST_MODE only bypasses the score,
-        // not the recipient, so you can verify delivery end-to-end
         await sendEmail({
           to: target.email,
           subject: 'Someone wants to connect on Abeille',
@@ -115,7 +124,7 @@ export async function POST(req: NextRequest) {
             target.body,
             '',
             'Their message:',
-            requesterMsg.body,
+            requesterMsg?.body ?? '(no message posted)',
             '',
             'Their email:',
             normalEmail,
@@ -136,8 +145,8 @@ export async function POST(req: NextRequest) {
 
     // REDIRECTED — find 3 better matches using requester's embedding
     const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
-      p_embedding: requesterMsg.embedding,
-      p_type: requesterMsg.type,
+      p_embedding: requesterMsg!.embedding,
+      p_type: requesterMsg!.type,
       p_exclude_id: target_message_id,
       p_limit: 3,
     })
