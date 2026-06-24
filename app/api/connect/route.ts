@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       .select('created_at')
       .eq('requester_email', normalEmail)
       .gt('created_at', since)
-      .limit(1)          // ← prevent maybeSingle() throw on multiple rows
+      .limit(1)
       .maybeSingle()
 
     if (recent) {
@@ -88,24 +88,31 @@ export async function POST(req: NextRequest) {
       finalScore = 0.40
     }
 
+    console.log('[abeille] match score:', finalScore, '| TEST_MODE:', TEST_MODE)
+
     // Store connection attempt
     await supabaseAdmin.from('connections').insert({
       requester_email: normalEmail,
       requester_message_id: requesterMsg.id,
       target_message_id,
       match_score: finalScore,
-      status: finalScore >= 0.52 ? 'accepted' : 'pending',  // ← single insert, no follow-up update
+      status: TEST_MODE || finalScore >= 0.52 ? 'accepted' : 'pending',
     })
 
     // Branch on score
-    if (finalScore >= 0.52) {
-      // CONNECTED — email is best-effort, don't let it fail the response
+    // TEST_MODE bypasses threshold so the full flow is testable with stub embeddings
+    if (TEST_MODE || finalScore >= 0.52) {
       try {
+        // Always send to real target email — TEST_MODE only bypasses the score,
+        // not the recipient, so you can verify delivery end-to-end
         await sendEmail({
-          to: TEST_MODE ? process.env.GMAIL_USER! : target.email,
+          to: target.email,
           subject: 'Someone wants to connect on Abeille',
           text: [
             'Someone saw your message and wants to connect.',
+            '',
+            'Your message:',
+            target.body,
             '',
             'Their message:',
             requesterMsg.body,
@@ -116,6 +123,7 @@ export async function POST(req: NextRequest) {
             "That's it. The rest is yours.",
           ].join('\n'),
         })
+        console.log('[abeille] connection email sent to:', target.email)
       } catch (emailErr) {
         console.error('[abeille] email send failed (connection still stored):', emailErr)
       }
@@ -126,9 +134,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // REDIRECTED — find 3 better matches using *requester's* embedding
+    // REDIRECTED — find 3 better matches using requester's embedding
     const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
-      p_embedding: requesterMsg.embedding,   // ← was target.embedding (wrong)
+      p_embedding: requesterMsg.embedding,
       p_type: requesterMsg.type,
       p_exclude_id: target_message_id,
       p_limit: 3,
