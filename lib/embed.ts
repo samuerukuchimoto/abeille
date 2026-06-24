@@ -1,4 +1,15 @@
+const TEST_MODE = process.env.TEST_MODE === 'true'
+
 export async function embed(text: string): Promise<number[]> {
+  // TEST_MODE: Groq nomic embedding requires verified access.
+  // Return a deterministic stub vector (768 dims) so posting works end-to-end.
+  // Cosine scores will be meaningless but the full flow is testable.
+  if (TEST_MODE) {
+    return Array.from({ length: 768 }, (_, i) =>
+      Math.sin(i * 0.1 + text.charCodeAt(i % text.length || 0) * 0.01)
+    )
+  }
+
   const res = await fetch('https://api.groq.com/openai/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -6,7 +17,7 @@ export async function embed(text: string): Promise<number[]> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'nomic-embed-text-v1.5',   // dot, not underscore
+      model: 'nomic-embed-text-v1.5',
       input: text,
     }),
   })
