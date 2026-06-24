@@ -6,12 +6,23 @@ export async function embed(text: string): Promise<number[]> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'nomic-embed-text-v1_5',
+      model: 'nomic-embed-text-v1.5',   // dot, not underscore
       input: text,
     }),
   })
+
   const data = await res.json()
-  if (!data.data?.[0]?.embedding) throw new Error('Embedding failed')
+
+  if (!res.ok) {
+    console.error('[abeille] Groq embed error:', res.status, JSON.stringify(data))
+    throw new Error(`Embedding failed: ${data?.error?.message ?? res.status}`)
+  }
+
+  if (!data.data?.[0]?.embedding) {
+    console.error('[abeille] Groq embed unexpected shape:', JSON.stringify(data))
+    throw new Error('Embedding failed: unexpected response shape')
+  }
+
   return data.data[0].embedding
 }
 
