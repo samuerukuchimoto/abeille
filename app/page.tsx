@@ -31,13 +31,9 @@ function wordCount(s: string) {
   return s.trim() === '' ? 0 : s.trim().split(/\s+/).length
 }
 
-function Card({
-  msg,
-  onPostFirst,
-}: {
-  msg: Message
-  onPostFirst: () => void
-}) {
+// ── Card ────────────────────────────────────────────────────────────────────
+
+function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
   const isSeek = msg.type === 'seek'
   const [connect, setConnect] = useState<ConnectState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -45,117 +41,173 @@ function Card({
   async function handleConnect() {
     if (!email || !email.includes('@')) return
     setConnect({ status: 'loading' })
-
     const res = await fetch('/api/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requester_email: email, target_message_id: msg.id }),
     })
     const data = await res.json()
-
-    if (res.status === 429) {
-      setConnect({ status: 'rate_limited' })
-    } else if (!res.ok) {
-      setConnect({ status: 'error', message: data.error })
-    } else if (data.outcome === 'connected') {
-      setConnect({ status: 'connected', message: data.message })
-    } else if (data.outcome === 'redirected') {
-      setConnect({ status: 'redirected', message: data.message, suggestions: data.suggestions })
-    } else if (data.outcome === 'waiting') {
-      setConnect({ status: 'waiting', message: data.message })
-    }
+    if (res.status === 429) setConnect({ status: 'rate_limited' })
+    else if (!res.ok) setConnect({ status: 'error', message: data.error })
+    else if (data.outcome === 'connected') setConnect({ status: 'connected', message: data.message })
+    else if (data.outcome === 'redirected') setConnect({ status: 'redirected', message: data.message, suggestions: data.suggestions })
+    else if (data.outcome === 'waiting') setConnect({ status: 'waiting', message: data.message })
   }
 
-  const cardStyle = isSeek
-    ? 'bg-[#F5C400] border-2 border-black text-black'
-    : 'bg-black border-2 border-[#F5C400] text-[#F5C400]'
+  // SEEK: yellow bg + black border + black text + hard black drop-shadow
+  // OFFER: black bg + yellow border + yellow text + hard yellow drop-shadow
+  const seek = {
+    card: {
+      background: '#F5C400',
+      border: '3px solid #000',
+      borderRadius: '20px',
+      padding: '1.125rem',
+      boxShadow: '6px 6px 0px 0px #000000',
+      transition: 'transform 100ms ease, box-shadow 100ms ease',
+    } as React.CSSProperties,
+    badge: {
+      display: 'inline-flex', alignItems: 'center', gap: '5px',
+      background: '#000', color: '#F5C400',
+      fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' as const,
+      padding: '3px 10px', borderRadius: '100px',
+    } as React.CSSProperties,
+    time: { color: 'rgba(0,0,0,0.45)', fontSize: '10px', fontWeight: 700 } as React.CSSProperties,
+    body: { color: '#000', fontSize: '15px', fontWeight: 700, lineHeight: 1.55 } as React.CSSProperties,
+    btn: {
+      background: '#000', color: '#F5C400',
+      border: '2px solid #000', borderRadius: '100px',
+      padding: '7px 18px', fontSize: '11px', fontWeight: 900,
+      letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+      cursor: 'pointer', transition: 'background 100ms ease, color 100ms ease',
+    } as React.CSSProperties,
+    input: {
+      background: 'rgba(0,0,0,0.12)', border: '2px solid rgba(0,0,0,0.35)',
+      borderRadius: '100px', color: '#000',
+      fontSize: '12px', fontWeight: 600,
+      padding: '8px 14px', width: '100%', outline: 'none',
+    } as React.CSSProperties,
+    label: { color: 'rgba(0,0,0,0.55)', fontSize: '11px', fontWeight: 700 } as React.CSSProperties,
+    link: { color: '#000', fontSize: '11px', fontWeight: 900, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 } as React.CSSProperties,
+    success: { color: '#000', fontSize: '12px', fontWeight: 900 } as React.CSSProperties,
+  }
 
-  const labelStyle = isSeek ? 'text-black/50' : 'text-[#F5C400]/50'
-  const timeStyle = isSeek ? 'text-black/40' : 'text-[#F5C400]/40'
+  const offer = {
+    card: {
+      background: '#000',
+      border: '3px solid #F5C400',
+      borderRadius: '20px',
+      padding: '1.125rem',
+      boxShadow: '6px 6px 0px 0px #F5C400',
+      transition: 'transform 100ms ease, box-shadow 100ms ease',
+    } as React.CSSProperties,
+    badge: {
+      display: 'inline-flex', alignItems: 'center', gap: '5px',
+      background: '#F5C400', color: '#000',
+      fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' as const,
+      padding: '3px 10px', borderRadius: '100px',
+    } as React.CSSProperties,
+    time: { color: 'rgba(245,196,0,0.45)', fontSize: '10px', fontWeight: 700 } as React.CSSProperties,
+    body: { color: '#F5C400', fontSize: '15px', fontWeight: 700, lineHeight: 1.55 } as React.CSSProperties,
+    btn: {
+      background: '#F5C400', color: '#000',
+      border: '2px solid #F5C400', borderRadius: '100px',
+      padding: '7px 18px', fontSize: '11px', fontWeight: 900,
+      letterSpacing: '0.12em', textTransform: 'uppercase' as const,
+      cursor: 'pointer', transition: 'background 100ms ease, color 100ms ease',
+    } as React.CSSProperties,
+    input: {
+      background: 'rgba(245,196,0,0.08)', border: '2px solid rgba(245,196,0,0.35)',
+      borderRadius: '100px', color: '#F5C400',
+      fontSize: '12px', fontWeight: 600,
+      padding: '8px 14px', width: '100%', outline: 'none',
+    } as React.CSSProperties,
+    label: { color: 'rgba(245,196,0,0.55)', fontSize: '11px', fontWeight: 700 } as React.CSSProperties,
+    link: { color: '#F5C400', fontSize: '11px', fontWeight: 900, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 } as React.CSSProperties,
+    success: { color: '#F5C400', fontSize: '12px', fontWeight: 900 } as React.CSSProperties,
+  }
 
-  const btnStyle = isSeek
-    ? 'border border-black text-black text-xs px-3 py-1 hover:bg-black hover:text-[#F5C400] transition-colors'
-    : 'border border-[#F5C400] text-[#F5C400] text-xs px-3 py-1 hover:bg-[#F5C400] hover:text-black transition-colors'
-
-  const inputStyle = isSeek
-    ? 'bg-black/10 border border-black/30 text-black placeholder:text-black/40 text-xs px-2 py-1.5 w-full outline-none focus:border-black'
-    : 'bg-white/5 border border-[#F5C400]/30 text-[#F5C400] placeholder:text-[#F5C400]/40 text-xs px-2 py-1.5 w-full outline-none focus:border-[#F5C400]'
+  const s = isSeek ? seek : offer
 
   return (
-    <div className={`${cardStyle} p-3 ${msg.fresh ? 'animate-fadein' : ''}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-[10px] uppercase tracking-widest font-semibold ${labelStyle}`}>
-          {isSeek ? 'seeking' : 'offering'}
-        </span>
-        <span className={`text-[10px] ${timeStyle}`}>{msg.time_ago}</span>
+    <div
+      style={s.card}
+      className={msg.fresh ? 'card-enter' : ''}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget
+        el.style.transform = 'translate(-2px, -2px)'
+        el.style.boxShadow = isSeek ? '8px 8px 0px 0px #000000' : '8px 8px 0px 0px #F5C400'
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget
+        el.style.transform = 'translate(0, 0)'
+        el.style.boxShadow = isSeek ? '6px 6px 0px 0px #000000' : '6px 6px 0px 0px #F5C400'
+      }}
+    >
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <span style={s.badge}>◆ {isSeek ? 'seeking' : 'offering'}</span>
+        <span style={s.time}>{msg.time_ago}</span>
       </div>
 
-      <p className="text-sm leading-relaxed mb-3">{msg.body}</p>
+      {/* Body */}
+      <p style={{ ...s.body, marginBottom: '16px' }}>{msg.body}</p>
 
+      {/* Connect states */}
       {connect.status === 'idle' && (
-        <button className={btnStyle} onClick={() => setConnect({ status: 'open' })}>
-          Connect →
+        <button style={s.btn} onClick={() => setConnect({ status: 'open' })}>
+          connect →
         </button>
       )}
 
       {connect.status === 'open' && (
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <input
             type="email"
-            placeholder="your@email.com to connect"
+            placeholder="your@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={inputStyle}
+            onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+            style={s.input}
           />
-          <button
-            className={`${btnStyle} w-full text-center`}
-            onClick={handleConnect}
-          >
+          <button style={s.btn} onClick={handleConnect}>
             send request →
           </button>
         </div>
       )}
 
       {connect.status === 'loading' && (
-        <p className={`text-[11px] ${labelStyle} mt-2`}>sending…</p>
+        <p style={s.label}>sending…</p>
       )}
 
       {connect.status === 'connected' && (
-        <p className={`text-[11px] font-medium mt-2 ${isSeek ? 'text-black' : 'text-[#F5C400]'}`}>
-          {connect.message}
-        </p>
+        <p style={s.success}>✓ {connect.message}</p>
       )}
 
       {connect.status === 'rate_limited' && (
-        <p className={`text-[11px] mt-2 ${labelStyle}`}>
-          One connection per 24 hours. Come back tomorrow.
-        </p>
+        <p style={s.label}>One connection per 24h. Come back tomorrow.</p>
       )}
 
       {connect.status === 'error' && (
-        <p className="text-[11px] mt-2 text-red-500">{connect.message}</p>
+        <p style={{ color: '#FF4040', fontSize: '11px', fontWeight: 700 }}>{connect.message}</p>
       )}
 
       {connect.status === 'waiting' && (
-        <div className="mt-2">
-          <p className={`text-[11px] ${labelStyle} mb-1`}>
-            Post your own message first — it helps us find your closest match.
+        <div>
+          <p style={{ ...s.label, marginBottom: '6px' }}>
+            Post your own signal first — helps us find your closest match.
           </p>
-          <button
-            className={`text-[11px] underline ${isSeek ? 'text-black' : 'text-[#F5C400]'}`}
-            onClick={onPostFirst}
-          >
+          <button style={s.link} onClick={onPostFirst}>
             post yours →
           </button>
         </div>
       )}
 
       {connect.status === 'redirected' && (
-        <div className="mt-2">
-          <p className={`text-[11px] mb-2 ${labelStyle}`}>{connect.message}</p>
-          <div className="flex flex-col gap-2">
-            {connect.suggestions.map((s) => (
-              <MiniCard key={s.id} msg={s} onPostFirst={onPostFirst} />
+        <div>
+          <p style={{ ...s.label, marginBottom: '10px' }}>{connect.message}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {connect.suggestions.map((sg) => (
+              <MiniCard key={sg.id} msg={sg} onPostFirst={onPostFirst} />
             ))}
           </div>
         </div>
@@ -163,6 +215,8 @@ function Card({
     </div>
   )
 }
+
+// ── MiniCard ─────────────────────────────────────────────────────────────────
 
 function MiniCard({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
   const isSeek = msg.type === 'seek'
@@ -185,40 +239,68 @@ function MiniCard({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void 
     else setConnect({ status: 'redirected', message: data.message, suggestions: [] })
   }
 
-  const cardStyle = isSeek
-    ? 'bg-[#F5C400]/80 border border-black text-black'
-    : 'bg-black/80 border border-[#F5C400] text-[#F5C400]'
+  const card: React.CSSProperties = isSeek
+    ? { background: 'rgba(245,196,0,0.85)', border: '2px solid #000', borderRadius: '14px', padding: '10px 12px' }
+    : { background: 'rgba(0,0,0,0.9)', border: '2px solid #F5C400', borderRadius: '14px', padding: '10px 12px' }
 
-  const btnStyle = isSeek
-    ? 'border border-black text-black text-[10px] px-2 py-0.5 hover:bg-black hover:text-[#F5C400] transition-colors'
-    : 'border border-[#F5C400] text-[#F5C400] text-[10px] px-2 py-0.5 hover:bg-[#F5C400] hover:text-black transition-colors'
+  const bodyStyle: React.CSSProperties = {
+    color: isSeek ? '#000' : '#F5C400',
+    fontSize: '12px', fontWeight: 700, lineHeight: 1.5, marginBottom: '8px',
+  }
 
-  const inputStyle = isSeek
-    ? 'bg-black/10 border border-black/30 text-black placeholder:text-black/40 text-[10px] px-2 py-1 w-full outline-none'
-    : 'bg-white/5 border border-[#F5C400]/30 text-[#F5C400] placeholder:text-[#F5C400]/40 text-[10px] px-2 py-1 w-full outline-none'
+  const btnStyle: React.CSSProperties = {
+    background: isSeek ? '#000' : '#F5C400',
+    color: isSeek ? '#F5C400' : '#000',
+    border: 'none', borderRadius: '100px',
+    padding: '4px 12px', fontSize: '10px', fontWeight: 900,
+    letterSpacing: '0.12em', textTransform: 'uppercase',
+    cursor: 'pointer',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: isSeek ? 'rgba(0,0,0,0.12)' : 'rgba(245,196,0,0.1)',
+    border: isSeek ? '1px solid rgba(0,0,0,0.3)' : '1px solid rgba(245,196,0,0.3)',
+    borderRadius: '100px', color: isSeek ? '#000' : '#F5C400',
+    fontSize: '10px', fontWeight: 600,
+    padding: '5px 10px', flex: 1, outline: 'none',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    color: isSeek ? 'rgba(0,0,0,0.55)' : 'rgba(245,196,0,0.55)',
+    fontSize: '10px', fontWeight: 700,
+  }
 
   return (
-    <div className={`${cardStyle} p-2`}>
-      <p className="text-[11px] leading-relaxed mb-1.5">{msg.body}</p>
+    <div style={card}>
+      <p style={bodyStyle}>{msg.body}</p>
       {connect.status === 'idle' && (
-        <button className={btnStyle} onClick={() => setConnect({ status: 'open' })}>Connect →</button>
+        <button style={btnStyle} onClick={() => setConnect({ status: 'open' })}>connect →</button>
       )}
       {connect.status === 'open' && (
-        <div className="flex gap-1">
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <input type="email" placeholder="your@email.com" value={email}
-            onChange={(e) => setEmail(e.target.value)} className={inputStyle} />
-          <button className={btnStyle} onClick={handleConnect}>→</button>
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+            style={inputStyle} />
+          <button style={btnStyle} onClick={handleConnect}>→</button>
         </div>
       )}
-      {connect.status === 'loading' && <p className="text-[10px] opacity-50">sending…</p>}
-      {connect.status === 'connected' && <p className="text-[10px] font-medium">{connect.message}</p>}
-      {connect.status === 'rate_limited' && <p className="text-[10px] opacity-50">One connection per 24h.</p>}
+      {connect.status === 'loading' && <p style={labelStyle}>sending…</p>}
+      {connect.status === 'connected' && <p style={{ ...labelStyle, fontWeight: 900 }}>✓ connected</p>}
+      {connect.status === 'rate_limited' && <p style={labelStyle}>1 connection / 24h</p>}
       {connect.status === 'waiting' && (
-        <button className="text-[10px] underline opacity-70" onClick={onPostFirst}>post yours first →</button>
+        <button
+          style={{ ...labelStyle, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          onClick={onPostFirst}
+        >
+          post yours first →
+        </button>
       )}
     </div>
   )
 }
+
+// ── Home ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -231,13 +313,13 @@ export default function Home() {
   const wc = wordCount(body)
   const canPost = wc > 0 && wc <= 24 && email.includes('@') && !posting
 
+  const wcColor = wc > 24 ? '#FF4040' : wc > 20 ? '#F5C400' : 'rgba(255,255,255,0.25)'
+
   useEffect(() => {
-    // Initial load
     fetch('/api/messages')
       .then((r) => r.json())
       .then((d) => setMessages(d.messages ?? []))
 
-    // Realtime subscription
     const channel = supabase
       .channel('messages-board')
       .on(
@@ -250,29 +332,24 @@ export default function Home() {
       )
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   async function handlePost() {
     if (!canPost) return
     setPosting(true)
     setPostError('')
-
     const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, body }),
     })
     const data = await res.json()
-
     if (!res.ok) {
       setPostError(data.error)
       setPosting(false)
       return
     }
-
     setBody('')
     setPosting(false)
   }
@@ -283,50 +360,161 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white" style={{ fontFamily: 'system-ui, sans-serif' }}>
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-black border-b border-white/10 h-12 flex items-center justify-between px-4">
-        <span className="text-[#F5C400] text-lg font-medium tracking-tight">abeille</span>
-        <span className={`text-xs tabular-nums ${wc > 24 ? 'text-red-500' : wc > 20 ? 'text-[#F5C400]' : 'text-white/30'}`}>
-          {wc}/24
+    <div style={{
+      minHeight: '100vh',
+      background: '#000',
+      backgroundImage: 'radial-gradient(circle, #1C1500 1.5px, transparent 1.5px)',
+      backgroundSize: '22px 22px',
+      fontFamily: "'Nunito', system-ui, sans-serif",
+      color: '#fff',
+    }}>
+
+      {/* ── Header ── */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'rgba(0,0,0,0.92)',
+        borderBottom: '3px solid #F5C400',
+        backdropFilter: 'blur(8px)',
+        height: '52px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 20px',
+      }}>
+        <span style={{
+          color: '#F5C400', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.02em',
+          textShadow: '0 0 24px rgba(245,196,0,0.45)',
+        }}>
+          abeille
         </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{
+            fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: '#F5C400', border: '1px solid rgba(245,196,0,0.3)',
+            padding: '3px 9px', borderRadius: '100px',
+            display: 'flex', alignItems: 'center', gap: '5px',
+          }}>
+            <span style={{
+              width: '6px', height: '6px', borderRadius: '50%', background: '#F5C400',
+              animation: 'pulse 2s ease-in-out infinite',
+              display: 'inline-block',
+            }} />
+            live
+          </span>
+          <span style={{ fontSize: '12px', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: wcColor }}>
+            {wc}/24
+          </span>
+        </div>
       </header>
 
-      {/* Compose */}
-      <div className="border-b border-[#F5C400]/20 px-4 py-3 flex flex-col gap-2">
-        <textarea
-          ref={composeRef}
-          rows={2}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="say it in 24 words."
-          className="bg-black text-white placeholder:text-white/20 text-sm resize-none outline-none focus:outline-none w-full"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="your@email.com"
-          className="bg-black text-white placeholder:text-white/20 text-sm outline-none focus:outline-none w-full border-t border-white/10 pt-2"
-        />
-        {postError && <p className="text-red-500 text-xs">{postError}</p>}
-        <button
-          onClick={handlePost}
-          disabled={!canPost}
-          className="self-start bg-[#F5C400] text-black text-xs font-semibold px-4 py-1.5 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD000] transition-colors"
-        >
-          {posting ? 'posting…' : 'post →'}
-        </button>
+      {/* ── Compose ── */}
+      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 8px' }}>
+        <div style={{
+          background: '#000',
+          border: '3px solid #F5C400',
+          borderRadius: '22px',
+          padding: '18px 20px',
+          boxShadow: '6px 6px 0px 0px #F5C400',
+        }}>
+          <p style={{
+            fontSize: '9px', fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase',
+            color: 'rgba(245,196,0,0.45)', marginBottom: '12px',
+          }}>
+            ◆ your signal — 24 words max
+          </p>
+
+          <textarea
+            ref={composeRef}
+            rows={3}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="need something? offering something? say it."
+            style={{
+              background: 'transparent', color: '#fff',
+              fontSize: '15px', fontWeight: 600, lineHeight: 1.6,
+              resize: 'none', outline: 'none', width: '100%', border: 'none',
+              fontFamily: 'inherit',
+            }}
+          />
+
+          <div style={{
+            marginTop: '14px', paddingTop: '14px',
+            borderTop: '1px solid rgba(245,196,0,0.2)',
+            display: 'flex', flexDirection: 'column', gap: '10px',
+          }}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              style={{
+                background: 'rgba(245,196,0,0.06)',
+                border: '2px solid rgba(245,196,0,0.25)',
+                borderRadius: '100px', color: '#fff',
+                fontSize: '13px', fontWeight: 600,
+                padding: '9px 16px', outline: 'none',
+                fontFamily: 'inherit',
+                transition: 'border-color 100ms ease',
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#F5C400'}
+              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(245,196,0,0.25)'}
+            />
+
+            <button
+              onClick={handlePost}
+              disabled={!canPost}
+              style={{
+                alignSelf: 'flex-start',
+                background: canPost ? '#F5C400' : 'rgba(245,196,0,0.25)',
+                color: '#000',
+                border: '2px solid #F5C400',
+                borderRadius: '100px',
+                padding: '9px 24px',
+                fontSize: '12px', fontWeight: 900,
+                letterSpacing: '0.1em', textTransform: 'uppercase',
+                cursor: canPost ? 'pointer' : 'not-allowed',
+                transition: 'background 100ms ease, color 100ms ease',
+                fontFamily: 'inherit',
+                opacity: canPost ? 1 : 0.5,
+              }}
+              onMouseEnter={(e) => {
+                if (canPost) {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = '#F5C400'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (canPost) {
+                  e.currentTarget.style.background = '#F5C400'
+                  e.currentTarget.style.color = '#000'
+                }
+              }}
+            >
+              {posting ? 'posting…' : 'post →'}
+            </button>
+
+            {postError && (
+              <p style={{ color: '#FF4040', fontSize: '12px', fontWeight: 700 }}>{postError}</p>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Board */}
-      <main className="max-w-2xl mx-auto px-4 py-4">
+      {/* ── Board ── */}
+      <main style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 60px' }}>
         {messages.length === 0 ? (
-          <p className="text-white/20 text-sm text-center py-16">
-            no signals yet. be the first.
-          </p>
+          <div style={{ textAlign: 'center', padding: '72px 16px' }}>
+            <p style={{ color: 'rgba(245,196,0,0.2)', fontSize: '14px', fontWeight: 800 }}>
+              no signals yet.
+            </p>
+            <p style={{ color: 'rgba(245,196,0,0.1)', fontSize: '12px', fontWeight: 700, marginTop: '6px' }}>
+              be the first.
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '20px',
+          }}>
             {messages.map((msg) => (
               <Card key={msg.id} msg={msg} onPostFirst={scrollToCompose} />
             ))}
@@ -335,11 +523,36 @@ export default function Home() {
       </main>
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
         @keyframes fadein {
-          from { opacity: 0; transform: translateY(-6px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .animate-fadein { animation: fadein 200ms ease-out forwards; }
+        .card-enter {
+          animation: fadein 280ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.25; }
+        }
+
+        * { box-sizing: border-box; }
+        textarea::placeholder, input::placeholder { opacity: 1; }
+
+        @media (max-width: 560px) {
+          div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
       `}</style>
     </div>
   )
