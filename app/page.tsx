@@ -31,19 +31,6 @@ function wordCount(s: string) {
   return s.trim() === '' ? 0 : s.trim().split(/\s+/).length
 }
 
-// ── Shared style tokens ──────────────────────────────────────────────────────
-// Compose card: yellow bg / black text / black border
-// Board cards:  black bg / yellow text / yellow border (uniform, type shown via badge only)
-
-const CARD_BLACK: React.CSSProperties = {
-  background: '#000',
-  border: '3px solid #F5C400',
-  borderRadius: '20px',
-  padding: '1.125rem',
-  boxShadow: '6px 6px 0px 0px #F5C400',
-  transition: 'transform 100ms ease, box-shadow 100ms ease',
-}
-
 // ── Card ────────────────────────────────────────────────────────────────────
 
 function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
@@ -67,70 +54,79 @@ function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
     else if (data.outcome === 'waiting') setConnect({ status: 'waiting', message: data.message })
   }
 
-  // Badge: seek = solid yellow pill / offer = outlined yellow pill
-  const badgeStyle: React.CSSProperties = isSeek
-    ? { background: '#F5C400', color: '#000', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: '100px' }
-    : { background: 'transparent', color: '#F5C400', border: '1px solid #F5C400', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: '100px' }
-
-  const labelStyle: React.CSSProperties = { color: 'rgba(245,196,0,0.5)', fontSize: '11px', fontWeight: 700 }
-  const linkStyle: React.CSSProperties = { color: '#F5C400', fontSize: '11px', fontWeight: 900, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }
-
-  const btnStyle: React.CSSProperties = {
-    background: '#F5C400', color: '#000',
-    border: '2px solid #F5C400', borderRadius: '100px',
-    padding: '7px 18px', fontSize: '11px', fontWeight: 900,
-    letterSpacing: '0.12em', textTransform: 'uppercase',
-    cursor: 'pointer', transition: 'background 100ms ease, color 100ms ease',
+  // SEEK: yellow bg + black border + black text + hard black drop-shadow
+  // OFFER: black bg + yellow border + yellow text + hard yellow drop-shadow
+  const seek = {
+    card: { background: '#F5C400', border: '3px solid #000', borderRadius: '20px', padding: '1.125rem', boxShadow: '6px 6px 0px 0px #000000', transition: 'transform 100ms ease, box-shadow 100ms ease' } as React.CSSProperties,
+    badge: { display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#000', color: '#F5C400', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' as const, padding: '3px 10px', borderRadius: '100px' } as React.CSSProperties,
+    time: { color: 'rgba(0,0,0,0.45)', fontSize: '10px', fontWeight: 700 } as React.CSSProperties,
+    body: { color: '#000', fontSize: '15px', fontWeight: 700, lineHeight: 1.55 } as React.CSSProperties,
+    btn: { background: '#000', color: '#F5C400', border: '2px solid #000', borderRadius: '100px', padding: '7px 18px', fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' as const, cursor: 'pointer', transition: 'background 100ms ease, color 100ms ease', fontFamily: 'inherit' } as React.CSSProperties,
+    input: { background: 'rgba(0,0,0,0.12)', border: '2px solid rgba(0,0,0,0.35)', borderRadius: '100px', color: '#000', fontSize: '12px', fontWeight: 600, padding: '8px 14px', width: '100%', outline: 'none', fontFamily: 'inherit' } as React.CSSProperties,
+    label: { color: 'rgba(0,0,0,0.55)', fontSize: '11px', fontWeight: 700 } as React.CSSProperties,
+    link: { color: '#000', fontSize: '11px', fontWeight: 900, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 } as React.CSSProperties,
+    success: { color: '#000', fontSize: '12px', fontWeight: 900 } as React.CSSProperties,
   }
 
-  const inputStyle: React.CSSProperties = {
-    background: 'rgba(245,196,0,0.08)', border: '2px solid rgba(245,196,0,0.3)',
-    borderRadius: '100px', color: '#F5C400',
-    fontSize: '12px', fontWeight: 600,
-    padding: '8px 14px', width: '100%', outline: 'none', fontFamily: 'inherit',
+  const offer = {
+    card: { background: '#000', border: '3px solid #F5C400', borderRadius: '20px', padding: '1.125rem', boxShadow: '6px 6px 0px 0px #F5C400', transition: 'transform 100ms ease, box-shadow 100ms ease' } as React.CSSProperties,
+    badge: { display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#F5C400', color: '#000', fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' as const, padding: '3px 10px', borderRadius: '100px' } as React.CSSProperties,
+    time: { color: 'rgba(245,196,0,0.45)', fontSize: '10px', fontWeight: 700 } as React.CSSProperties,
+    body: { color: '#F5C400', fontSize: '15px', fontWeight: 700, lineHeight: 1.55 } as React.CSSProperties,
+    btn: { background: '#F5C400', color: '#000', border: '2px solid #F5C400', borderRadius: '100px', padding: '7px 18px', fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' as const, cursor: 'pointer', transition: 'background 100ms ease, color 100ms ease', fontFamily: 'inherit' } as React.CSSProperties,
+    input: { background: 'rgba(245,196,0,0.08)', border: '2px solid rgba(245,196,0,0.35)', borderRadius: '100px', color: '#F5C400', fontSize: '12px', fontWeight: 600, padding: '8px 14px', width: '100%', outline: 'none', fontFamily: 'inherit' } as React.CSSProperties,
+    label: { color: 'rgba(245,196,0,0.55)', fontSize: '11px', fontWeight: 700 } as React.CSSProperties,
+    link: { color: '#F5C400', fontSize: '11px', fontWeight: 900, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 } as React.CSSProperties,
+    success: { color: '#F5C400', fontSize: '12px', fontWeight: 900 } as React.CSSProperties,
   }
+
+  const s = isSeek ? seek : offer
 
   return (
     <div
-      style={CARD_BLACK}
+      style={s.card}
       className={msg.fresh ? 'card-enter' : ''}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translate(-2px,-2px)'; e.currentTarget.style.boxShadow = '8px 8px 0px 0px #F5C400' }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translate(0,0)'; e.currentTarget.style.boxShadow = '6px 6px 0px 0px #F5C400' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translate(-2px,-2px)'
+        e.currentTarget.style.boxShadow = isSeek ? '8px 8px 0px 0px #000000' : '8px 8px 0px 0px #F5C400'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translate(0,0)'
+        e.currentTarget.style.boxShadow = isSeek ? '6px 6px 0px 0px #000000' : '6px 6px 0px 0px #F5C400'
+      }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <span style={badgeStyle}>◆ {isSeek ? 'seeking' : 'offering'}</span>
-        <span style={{ color: 'rgba(245,196,0,0.4)', fontSize: '10px', fontWeight: 700 }}>{msg.time_ago}</span>
+        <span style={s.badge}>◆ {isSeek ? 'seeking' : 'offering'}</span>
+        <span style={s.time}>{msg.time_ago}</span>
       </div>
 
-      <p style={{ color: '#F5C400', fontSize: '15px', fontWeight: 700, lineHeight: 1.55, marginBottom: '16px' }}>
-        {msg.body}
-      </p>
+      <p style={{ ...s.body, marginBottom: '16px' }}>{msg.body}</p>
 
       {connect.status === 'idle' && (
-        <button style={btnStyle} onClick={() => setConnect({ status: 'open' })}>connect →</button>
+        <button style={s.btn} onClick={() => setConnect({ status: 'open' })}>connect →</button>
       )}
       {connect.status === 'open' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <input type="email" placeholder="your@email.com" value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-            style={inputStyle} />
-          <button style={btnStyle} onClick={handleConnect}>send request →</button>
+            style={s.input} />
+          <button style={s.btn} onClick={handleConnect}>send request →</button>
         </div>
       )}
-      {connect.status === 'loading' && <p style={labelStyle}>sending…</p>}
-      {connect.status === 'connected' && <p style={{ color: '#F5C400', fontSize: '12px', fontWeight: 900 }}>✓ {connect.message}</p>}
-      {connect.status === 'rate_limited' && <p style={labelStyle}>One connection per 24h. Come back tomorrow.</p>}
+      {connect.status === 'loading' && <p style={s.label}>sending…</p>}
+      {connect.status === 'connected' && <p style={s.success}>✓ {connect.message}</p>}
+      {connect.status === 'rate_limited' && <p style={s.label}>One connection per 24h. Come back tomorrow.</p>}
       {connect.status === 'error' && <p style={{ color: '#FF4040', fontSize: '11px', fontWeight: 700 }}>{connect.message}</p>}
       {connect.status === 'waiting' && (
         <div>
-          <p style={{ ...labelStyle, marginBottom: '6px' }}>Post your own signal first — helps us find your closest match.</p>
-          <button style={linkStyle} onClick={onPostFirst}>post yours →</button>
+          <p style={{ ...s.label, marginBottom: '6px' }}>Post your own signal first — helps us find your closest match.</p>
+          <button style={s.link} onClick={onPostFirst}>post yours →</button>
         </div>
       )}
       {connect.status === 'redirected' && (
         <div>
-          <p style={{ ...labelStyle, marginBottom: '10px' }}>{connect.message}</p>
+          <p style={{ ...s.label, marginBottom: '10px' }}>{connect.message}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {connect.suggestions.map((sg) => (
               <MiniCard key={sg.id} msg={sg} onPostFirst={onPostFirst} />
@@ -145,6 +141,7 @@ function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
 // ── MiniCard ─────────────────────────────────────────────────────────────────
 
 function MiniCard({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
+  const isSeek = msg.type === 'seek'
   const [connect, setConnect] = useState<ConnectState>({ status: 'idle' })
   const [email, setEmail] = useState('')
 
@@ -164,32 +161,45 @@ function MiniCard({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void 
     else setConnect({ status: 'redirected', message: data.message, suggestions: [] })
   }
 
+  const cardStyle: React.CSSProperties = isSeek
+    ? { background: 'rgba(245,196,0,0.85)', border: '2px solid #000', borderRadius: '14px', padding: '10px 12px' }
+    : { background: 'rgba(0,0,0,0.9)', border: '2px solid #F5C400', borderRadius: '14px', padding: '10px 12px' }
+
+  const bodyStyle: React.CSSProperties = { color: isSeek ? '#000' : '#F5C400', fontSize: '12px', fontWeight: 700, lineHeight: 1.5, marginBottom: '8px' }
+
+  const btnStyle: React.CSSProperties = {
+    background: isSeek ? '#000' : '#F5C400', color: isSeek ? '#F5C400' : '#000',
+    border: 'none', borderRadius: '100px', padding: '4px 12px',
+    fontSize: '10px', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: isSeek ? 'rgba(0,0,0,0.12)' : 'rgba(245,196,0,0.1)',
+    border: isSeek ? '1px solid rgba(0,0,0,0.3)' : '1px solid rgba(245,196,0,0.3)',
+    borderRadius: '100px', color: isSeek ? '#000' : '#F5C400',
+    fontSize: '10px', fontWeight: 600, padding: '5px 10px', flex: 1, outline: 'none', fontFamily: 'inherit',
+  }
+
+  const labelStyle: React.CSSProperties = { color: isSeek ? 'rgba(0,0,0,0.55)' : 'rgba(245,196,0,0.55)', fontSize: '10px', fontWeight: 700 }
+
   return (
-    <div style={{ background: '#000', border: '2px solid #F5C400', borderRadius: '14px', padding: '10px 12px' }}>
-      <p style={{ color: '#F5C400', fontSize: '12px', fontWeight: 700, lineHeight: 1.5, marginBottom: '8px' }}>{msg.body}</p>
-      {connect.status === 'idle' && (
-        <button
-          style={{ background: '#F5C400', color: '#000', border: 'none', borderRadius: '100px', padding: '4px 12px', fontSize: '10px', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}
-          onClick={() => setConnect({ status: 'open' })}
-        >connect →</button>
-      )}
+    <div style={cardStyle}>
+      <p style={bodyStyle}>{msg.body}</p>
+      {connect.status === 'idle' && <button style={btnStyle} onClick={() => setConnect({ status: 'open' })}>connect →</button>}
       {connect.status === 'open' && (
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <input type="email" placeholder="your@email.com" value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-            style={{ background: 'rgba(245,196,0,0.08)', border: '1px solid rgba(245,196,0,0.3)', borderRadius: '100px', color: '#F5C400', fontSize: '10px', fontWeight: 600, padding: '5px 10px', flex: 1, outline: 'none', fontFamily: 'inherit' }} />
-          <button
-            style={{ background: '#F5C400', color: '#000', border: 'none', borderRadius: '100px', padding: '5px 10px', fontSize: '10px', fontWeight: 900, cursor: 'pointer' }}
-            onClick={handleConnect}
-          >→</button>
+            style={inputStyle} />
+          <button style={btnStyle} onClick={handleConnect}>→</button>
         </div>
       )}
-      {connect.status === 'loading' && <p style={{ color: 'rgba(245,196,0,0.5)', fontSize: '10px', fontWeight: 700 }}>sending…</p>}
-      {connect.status === 'connected' && <p style={{ color: '#F5C400', fontSize: '10px', fontWeight: 900 }}>✓ connected</p>}
-      {connect.status === 'rate_limited' && <p style={{ color: 'rgba(245,196,0,0.5)', fontSize: '10px', fontWeight: 700 }}>1 connection / 24h</p>}
+      {connect.status === 'loading' && <p style={labelStyle}>sending…</p>}
+      {connect.status === 'connected' && <p style={{ ...labelStyle, fontWeight: 900 }}>✓ connected</p>}
+      {connect.status === 'rate_limited' && <p style={labelStyle}>1 connection / 24h</p>}
       {connect.status === 'waiting' && (
-        <button style={{ color: 'rgba(245,196,0,0.5)', fontSize: '10px', fontWeight: 700, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        <button style={{ ...labelStyle, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           onClick={onPostFirst}>post yours first →</button>
       )}
     </div>
@@ -208,7 +218,7 @@ export default function Home() {
 
   const wc = wordCount(body)
   const canPost = wc > 0 && wc <= 24 && email.includes('@') && !posting
-  const wcColor = wc > 24 ? '#FF4040' : wc > 20 ? '#000' : 'rgba(0,0,0,0.3)'
+  const wcColor = wc > 24 ? '#FF4040' : wc > 20 ? '#F5C400' : 'rgba(255,255,255,0.25)'
 
   useEffect(() => {
     fetch('/api/messages')
@@ -259,12 +269,9 @@ export default function Home() {
       {/* ── Header ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 20,
-        background: 'rgba(0,0,0,0.92)',
-        borderBottom: '3px solid #F5C400',
-        backdropFilter: 'blur(8px)',
-        height: '52px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px',
+        background: 'rgba(0,0,0,0.92)', borderBottom: '3px solid #F5C400',
+        backdropFilter: 'blur(8px)', height: '52px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px',
       }}>
         <span style={{ color: '#F5C400', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.02em', textShadow: '0 0 24px rgba(245,196,0,0.45)' }}>
           abeille
@@ -274,22 +281,20 @@ export default function Home() {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#F5C400', animation: 'pulse 2s ease-in-out infinite', display: 'inline-block' }} />
             live
           </span>
-          <span style={{ fontSize: '12px', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: wcColor === 'rgba(0,0,0,0.3)' ? 'rgba(255,255,255,0.25)' : wcColor }}>
-            {wc}/24
-          </span>
+          <span style={{ fontSize: '12px', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: wcColor }}>{wc}/24</span>
         </div>
       </header>
 
-      {/* ── Compose — YELLOW card ── */}
+      {/* ── Compose — BLACK card with yellow border ── */}
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 8px' }}>
         <div style={{
-          background: '#F5C400',        // ← yellow bg
-          border: '3px solid #000',     // ← black border
+          background: '#000',
+          border: '3px solid #F5C400',
           borderRadius: '22px',
           padding: '18px 20px',
-          boxShadow: '6px 6px 0px 0px #000',  // ← black shadow
+          boxShadow: '6px 6px 0px 0px #F5C400',
         }}>
-          <p style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.4)', marginBottom: '12px' }}>
+          <p style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(245,196,0,0.45)', marginBottom: '12px' }}>
             ◆ your signal — 24 words max
           </p>
 
@@ -300,58 +305,48 @@ export default function Home() {
             onChange={(e) => setBody(e.target.value)}
             placeholder="need something? offering something? say it."
             style={{
-              background: 'transparent', color: '#000',
-              fontSize: '15px', fontWeight: 700, lineHeight: 1.6,
-              resize: 'none', outline: 'none', width: '100%', border: 'none',
-              fontFamily: 'inherit',
+              background: 'transparent', color: '#fff',
+              fontSize: '15px', fontWeight: 600, lineHeight: 1.6,
+              resize: 'none', outline: 'none', width: '100%', border: 'none', fontFamily: 'inherit',
             }}
           />
 
-          <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(245,196,0,0.2)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               style={{
-                background: 'rgba(0,0,0,0.08)',
-                border: '2px solid rgba(0,0,0,0.25)',
-                borderRadius: '100px', color: '#000',
-                fontSize: '13px', fontWeight: 600,
-                padding: '9px 16px', outline: 'none', fontFamily: 'inherit',
-                transition: 'border-color 100ms ease',
+                background: 'rgba(245,196,0,0.06)', border: '2px solid rgba(245,196,0,0.25)',
+                borderRadius: '100px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                padding: '9px 16px', outline: 'none', fontFamily: 'inherit', transition: 'border-color 100ms ease',
               }}
-              onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(0,0,0,0.6)'}
-              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(0,0,0,0.25)'}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#F5C400'}
+              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(245,196,0,0.25)'}
             />
-
             <button
               onClick={handlePost}
               disabled={!canPost}
               style={{
                 alignSelf: 'flex-start',
-                background: '#000',
-                color: '#F5C400',
-                border: '2px solid #000',
-                borderRadius: '100px',
-                padding: '9px 24px',
-                fontSize: '12px', fontWeight: 900,
+                background: '#F5C400', color: '#000',
+                border: '2px solid #F5C400', borderRadius: '100px',
+                padding: '9px 24px', fontSize: '12px', fontWeight: 900,
                 letterSpacing: '0.1em', textTransform: 'uppercase',
                 cursor: canPost ? 'pointer' : 'not-allowed',
                 opacity: canPost ? 1 : 0.4,
-                fontFamily: 'inherit',
-                transition: 'opacity 100ms ease',
+                fontFamily: 'inherit', transition: 'opacity 100ms ease',
               }}
             >
               {posting ? 'posting…' : 'post →'}
             </button>
-
-            {postError && <p style={{ color: '#CC0000', fontSize: '12px', fontWeight: 700 }}>{postError}</p>}
+            {postError && <p style={{ color: '#FF4040', fontSize: '12px', fontWeight: 700 }}>{postError}</p>}
           </div>
         </div>
       </div>
 
-      {/* ── Board — BLACK cards ── */}
+      {/* ── Board ── */}
       <main style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 60px' }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '72px 16px' }}>
@@ -373,7 +368,7 @@ export default function Home() {
         .card-enter { animation: fadein 280ms cubic-bezier(0.34,1.56,0.64,1) forwards; }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.25; } }
         * { box-sizing: border-box; }
-        textarea::placeholder { color: rgba(0,0,0,0.35); }
+        textarea::placeholder { color: rgba(255,255,255,0.2); }
         input::placeholder { color: inherit; opacity: 0.45; }
         @media (max-width:560px) { div[style*="auto-fill"] { grid-template-columns: 1fr !important; } }
         @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
