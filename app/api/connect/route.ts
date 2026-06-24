@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       .select('created_at')
       .eq('requester_email', normalEmail)
       .gt('created_at', since)
+      .limit(1)          // ← prevent maybeSingle() throw on multiple rows
       .maybeSingle()
 
     if (recent) {
@@ -45,6 +46,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message not found or expired' }, { status: 404 })
     }
 
+    // Block self-connection
+    if (target.email === normalEmail) {
+      return NextResponse.json({ error: 'Cannot connect to your own message' }, { status: 400 })
+    }
+
     // Fetch requester's active message
     const { data: requesterMsg } = await supabaseAdmin
       .from('messages')
@@ -54,10 +60,27 @@ export async function POST(req: NextRequest) {
       .gt('expires_at', new Date().toISOString())
       .maybeSingle()
 
+    // If requester has no message, short-circuit before scoring
+    if (!requesterMsg) {
+      await supabaseAdmin.from('connections').insert({
+        requester_email: normalEmail,
+        requester_message_id: null,
+        target_message_id,
+        match_score: 0,
+        status: 'pending',
+      })
+
+      return NextResponse.json({
+        outcome: 'waiting',
+        message: 'Post your own message first — it helps us find your closest match.',
+        suggestions: [],
+      })
+    }
+
     // Compute match score
     let finalScore: number
 
-    if (requesterMsg && requesterMsg.embedding && target.embedding) {
+    if (requesterMsg.embedding && target.embedding) {
       const score = cosineSim(requesterMsg.embedding, target.embedding)
       const bonus = requesterMsg.type !== target.type ? 0.08 : -0.05
       finalScore = score + bonus
@@ -68,58 +91,54 @@ export async function POST(req: NextRequest) {
     // Store connection attempt
     await supabaseAdmin.from('connections').insert({
       requester_email: normalEmail,
-      requester_message_id: requesterMsg?.id ?? null,
+      requester_message_id: requesterMsg.id,
       target_message_id,
       match_score: finalScore,
-      status: 'pending',
+      status: finalScore >= 0.52 ? 'accepted' : 'pending',  // ← single insert, no follow-up update
     })
 
     // Branch on score
     if (finalScore >= 0.52) {
-      // CONNECTED
-      await supabaseAdmin
-        .from('connections')
-        .update({ status: 'accepted' })
-        .eq('requester_email', normalEmail)
-        .eq('target_message_id', target_message_id)
-
-      await sendEmail({
-        to: TEST_MODE ? process.env.GMAIL_USER! : target.email,
-        subject: 'Someone wants to connect on Abeille',
-        text: [
-          'Someone saw your message and wants to connect.',
-          '',
-          'Their message:',
-          requesterMsg?.body ?? "They haven't posted a message yet.",
-          '',
-          'Their email:',
-          normalEmail,
-          '',
-          "That's it. The rest is yours.",
-        ].join('\n'),
-      })
+      // CONNECTED — email is best-effort, don't let it fail the response
+      try {
+        await sendEmail({
+          to: TEST_MODE ? process.env.GMAIL_USER! : target.email,
+          subject: 'Someone wants to connect on Abeille',
+          text: [
+            'Someone saw your message and wants to connect.',
+            '',
+            'Their message:',
+            requesterMsg.body,
+            '',
+            'Their email:',
+            normalEmail,
+            '',
+            "That's it. The rest is yours.",
+          ].join('\n'),
+        })
+      } catch (emailErr) {
+        console.error('[abeille] email send failed (connection still stored):', emailErr)
+      }
 
       return NextResponse.json({
         outcome: 'connected',
         message: "Connection request sent. They'll receive an email.",
       })
-    } else {
-      // REDIRECTED — find 3 better matches
-      const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
-        p_embedding: target.embedding,
-        p_type: requesterMsg?.type ?? 'offer',
-        p_exclude_id: target_message_id,
-        p_limit: 3,
-      })
-
-      return NextResponse.json({
-        outcome: requesterMsg ? 'redirected' : 'waiting',
-        message: requesterMsg
-          ? "This isn't your closest signal. These might be:"
-          : 'Post your own message first — it helps us find your closest match.',
-        suggestions: suggestions ?? [],
-      })
     }
+
+    // REDIRECTED — find 3 better matches using *requester's* embedding
+    const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
+      p_embedding: requesterMsg.embedding,   // ← was target.embedding (wrong)
+      p_type: requesterMsg.type,
+      p_exclude_id: target_message_id,
+      p_limit: 3,
+    })
+
+    return NextResponse.json({
+      outcome: 'redirected',
+      message: "This isn't your closest signal. These might be:",
+      suggestions: suggestions ?? [],
+    })
   } catch (err: unknown) {
     const e = err as Error
     console.error('[abeille] POST /api/connect:', e)

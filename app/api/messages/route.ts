@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { embed } from '@/lib/embed'
 
-const TEST_MODE = process.env.TEST_MODE === 'true'
-
 function wordCount(s: string) {
   return s.trim() === '' ? 0 : s.trim().split(/\s+/).length
 }
@@ -23,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
     }
-    if (!body) {
+    if (!body || wordCount(body) === 0) {
       return NextResponse.json({ error: 'Message body required' }, { status: 400 })
     }
     if (wordCount(body) > 24) {
@@ -76,13 +74,30 @@ Output valid JSON only:
       }),
     })
 
+    // Guard Groq failure — don't silently store undefined essence
+    if (!groqRes.ok) {
+      const errText = await groqRes.text()
+      console.error('[abeille] Groq classify failed:', groqRes.status, errText)
+      return NextResponse.json({ error: 'Classification service unavailable' }, { status: 502 })
+    }
+
     const groqData = await groqRes.json()
     const raw = groqData.choices?.[0]?.message?.content ?? '{}'
     const clean = raw.replace(/```json|```/g, '').trim()
-    const { type, essence } = JSON.parse(clean)
+
+    let type: string = 'seek'
+    let essence: string = ''
+    try {
+      const parsed = JSON.parse(clean)
+      type = parsed.type ?? 'seek'
+      essence = parsed.essence ?? ''
+    } catch {
+      console.error('[abeille] Groq JSON parse failed, raw:', clean)
+      // Continue with defaults — message still gets posted
+    }
 
     // Embed body + essence combined
-    const embedding = await embed(body + ' ' + (essence ?? ''))
+    const embedding = await embed(body + (essence ? ' ' + essence : ''))
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
@@ -92,7 +107,7 @@ Output valid JSON only:
         email: normalEmail,
         body: body.trim(),
         type: type === 'offer' ? 'offer' : 'seek',
-        essence,
+        essence: essence || null,
         embedding,
         word_count: wordCount(body),
         expires_at: expiresAt,
