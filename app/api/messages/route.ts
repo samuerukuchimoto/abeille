@@ -62,19 +62,22 @@ export async function POST(req: NextRequest) {
             content: `You classify and distill a short human message for a public exchange board. The message is at most 24 words.
 
 Determine:
-- type: is this person primarily SEEKING something they need, or OFFERING something they have? Answer 'seek' or 'offer'. If ambiguous, answer 'seek'.
+- type:
+  'problem' if this person is describing a specific problem they need solved and wants public responses
+  'offer' if they are offering something they have or can do
+  'seek' if they need something but it's not a specific solvable problem (general need, looking for person, etc.)
+  If ambiguous between problem and seek, choose 'problem'.
 - essence: rewrite the core signal in 10 words or fewer, third person, no demographics, pure need or offer.
   Example: 'Has legal expertise, needs distribution in France.'
 
 Output valid JSON only:
-{ "type": "seek" | "offer", "essence": "..." }`,
+{ "type": "problem" | "seek" | "offer", "essence": "..." }`,
           },
           { role: 'user', content: body },
         ],
       }),
     })
 
-    // Guard Groq failure — don't silently store undefined essence
     if (!groqRes.ok) {
       const errText = await groqRes.text()
       console.error('[abeille] Groq classify failed:', groqRes.status, errText)
@@ -93,10 +96,8 @@ Output valid JSON only:
       essence = parsed.essence ?? ''
     } catch {
       console.error('[abeille] Groq JSON parse failed, raw:', clean)
-      // Continue with defaults — message still gets posted
     }
 
-    // Embed body + essence combined
     const embedding = await embed(body + (essence ? ' ' + essence : ''))
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
@@ -106,7 +107,7 @@ Output valid JSON only:
       .insert({
         email: normalEmail,
         body: body.trim(),
-        type: type === 'offer' ? 'offer' : 'seek',
+        type: ['problem', 'offer'].includes(type) ? type : 'seek',
         essence: essence || null,
         embedding,
         word_count: wordCount(body),

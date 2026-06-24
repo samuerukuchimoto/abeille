@@ -11,10 +11,12 @@ const supabase = createClient(
 type Message = {
   id: string
   body: string
-  type: 'seek' | 'offer'
+  type: 'seek' | 'offer' | 'problem'
   time_ago: string
   created_at: string
   fresh?: boolean
+  response_count?: number
+  is_solved?: boolean
 }
 
 type ConnectState =
@@ -54,8 +56,6 @@ function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
     else if (data.outcome === 'waiting') setConnect({ status: 'waiting', message: data.message })
   }
 
-  // SEEK: yellow bg + black border + black text + hard black drop-shadow
-  // OFFER: black bg + yellow border + yellow text + hard yellow drop-shadow
   const seek = {
     card: {
       background: '#F5C400',
@@ -143,16 +143,13 @@ function Card({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void }) {
         el.style.boxShadow = isSeek ? '6px 6px 0px 0px #000000' : '6px 6px 0px 0px #F5C400'
       }}
     >
-      {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <span style={s.badge}>◆ {isSeek ? 'seeking' : 'offering'}</span>
         <span style={s.time}>{msg.time_ago}</span>
       </div>
 
-      {/* Body */}
       <p style={{ ...s.body, marginBottom: '16px' }}>{msg.body}</p>
 
-      {/* Connect states */}
       {connect.status === 'idle' && (
         <button style={s.btn} onClick={() => setConnect({ status: 'open' })}>
           connect →
@@ -300,6 +297,232 @@ function MiniCard({ msg, onPostFirst }: { msg: Message; onPostFirst: () => void 
   )
 }
 
+// ── ProblemCard ──────────────────────────────────────────────────────────────
+
+type ResponseItem = {
+  id: string
+  body: string
+  time_ago: string
+  is_approved: boolean
+}
+
+type RespondState =
+  | { status: 'idle' }
+  | { status: 'open' }
+  | { status: 'loading' }
+  | { status: 'posted' }
+  | { status: 'error'; message: string }
+
+type ExpandState =
+  | { status: 'collapsed' }
+  | { status: 'loading' }
+  | { status: 'loaded'; responses: ResponseItem[] }
+  | { status: 'error'; message: string }
+
+function ProblemCard({ msg }: { msg: Message }) {
+  const [expand, setExpand] = useState<ExpandState>({ status: 'collapsed' })
+  const [respond, setRespond] = useState<RespondState>({ status: 'idle' })
+  const [respondBody, setRespondBody] = useState('')
+  const [respondEmail, setRespondEmail] = useState('')
+  const [count, setCount] = useState(msg.response_count ?? 0)
+  const [solved, setSolved] = useState(!!msg.is_solved)
+
+  const [approveOpenId, setApproveOpenId] = useState<string | null>(null)
+  const [approveEmail, setApproveEmail] = useState('')
+  const [approveStatus, setApproveStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [approveError, setApproveError] = useState('')
+
+  const respondWc = wordCount(respondBody)
+  const respondInvalid = respondWc === 0 || respondWc > 24 || !respondEmail.includes('@')
+
+  const styleCard: React.CSSProperties = {
+    background: '#000',
+    border: solved ? '2px solid rgba(245,196,0,0.4)' : '2px solid #F5C400',
+    borderRadius: '20px',
+    padding: '1.125rem',
+  }
+  const label: React.CSSProperties = {
+    fontSize: '9px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase',
+    color: '#F5C400', border: '1px solid rgba(245,196,0,0.3)',
+    padding: '3px 10px', borderRadius: '100px', display: 'inline-flex',
+  }
+  const time: React.CSSProperties = { color: 'rgba(245,196,0,0.45)', fontSize: '10px', fontWeight: 700 }
+  const bodyStyle: React.CSSProperties = { color: '#F5C400', fontSize: '15px', fontWeight: 700, lineHeight: 1.55 }
+  const link: React.CSSProperties = {
+    color: '#F5C400', fontSize: '11px', fontWeight: 900, textDecoration: 'underline',
+    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+  }
+  const btn: React.CSSProperties = {
+    background: '#F5C400', color: '#000', border: '2px solid #F5C400', borderRadius: '100px',
+    padding: '7px 18px', fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em',
+    textTransform: 'uppercase', cursor: 'pointer',
+  }
+  const input: React.CSSProperties = {
+    background: 'rgba(245,196,0,0.08)', border: '2px solid rgba(245,196,0,0.35)',
+    borderRadius: '100px', color: '#F5C400', fontSize: '12px', fontWeight: 600,
+    padding: '8px 14px', width: '100%', outline: 'none',
+  }
+
+  async function loadResponses() {
+    if (expand.status === 'loaded') {
+      setExpand({ status: 'collapsed' })
+      return
+    }
+    setExpand({ status: 'loading' })
+    const res = await fetch(`/api/responses?problem_id=${msg.id}`)
+    const data = await res.json()
+    if (!res.ok) setExpand({ status: 'error', message: data.error ?? 'Failed to load' })
+    else setExpand({ status: 'loaded', responses: data.responses ?? [] })
+  }
+
+  async function handleRespond() {
+    if (respondInvalid) return
+    setRespond({ status: 'loading' })
+    const res = await fetch('/api/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem_id: msg.id, responder_email: respondEmail, body: respondBody }),
+    })
+    const data = await res.json()
+    if (!res.ok) setRespond({ status: 'error', message: data.error })
+    else {
+      setRespond({ status: 'posted' })
+      setCount((c) => c + 1)
+    }
+  }
+
+  async function handleApprove(responseId: string) {
+    if (!approveEmail.includes('@')) return
+    setApproveStatus('loading')
+    const res = await fetch('/api/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response_id: responseId, approver_email: approveEmail }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setApproveStatus('error')
+      setApproveError(data.error ?? 'Approval failed')
+    } else {
+      setApproveStatus('done')
+      setSolved(true)
+    }
+  }
+
+  return (
+    <div style={styleCard} className={msg.fresh ? 'card-enter' : ''}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <span style={label}>◆ {solved ? 'solved' : 'problem'}</span>
+        <span style={time}>{msg.time_ago}</span>
+      </div>
+
+      <p style={{ ...bodyStyle, marginBottom: '12px' }}>{msg.body}</p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <button style={link} onClick={loadResponses}>
+          {count} response{count === 1 ? '' : 's'} →
+        </button>
+        {!solved && respond.status === 'idle' && (
+          <button style={link} onClick={() => setRespond({ status: 'open' })}>respond →</button>
+        )}
+      </div>
+
+      {respond.status === 'open' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+          <textarea
+            rows={2}
+            value={respondBody}
+            onChange={(e) => setRespondBody(e.target.value)}
+            placeholder="your response — 24 words max"
+            style={{ ...input, borderRadius: '14px', resize: 'none', fontFamily: 'inherit', padding: '10px 14px' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: respondWc > 24 ? '#FF4040' : 'rgba(245,196,0,0.4)' }}>
+              {respondWc}/24
+            </span>
+          </div>
+          <input
+            type="email"
+            placeholder="your@email.com"
+            value={respondEmail}
+            onChange={(e) => setRespondEmail(e.target.value)}
+            style={input}
+          />
+          <button
+            style={{ ...btn, opacity: respondInvalid ? 0.4 : 1, cursor: respondInvalid ? 'not-allowed' : 'pointer' }}
+            onClick={handleRespond}
+            disabled={respondInvalid}
+          >
+            post response →
+          </button>
+        </div>
+      )}
+      {respond.status === 'loading' && <p style={{ ...time, marginTop: '8px' }}>posting…</p>}
+      {respond.status === 'posted' && <p style={{ color: '#F5C400', fontSize: '12px', fontWeight: 900, marginTop: '8px' }}>✓ response posted</p>}
+      {respond.status === 'error' && <p style={{ color: '#FF4040', fontSize: '11px', fontWeight: 700, marginTop: '8px' }}>{respond.message}</p>}
+
+      {expand.status === 'loading' && <p style={{ ...time, marginTop: '12px' }}>loading…</p>}
+      {expand.status === 'error' && <p style={{ color: '#FF4040', fontSize: '11px', fontWeight: 700, marginTop: '12px' }}>{expand.message}</p>}
+      {expand.status === 'loaded' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+          {expand.responses.length === 0 && <p style={time}>no responses yet.</p>}
+          {expand.responses.map((r) => (
+            <div
+              key={r.id}
+              style={{
+                background: '#1a1a00',
+                border: '1px solid rgba(245,196,0,0.3)',
+                borderRadius: '14px',
+                padding: '10px 12px',
+                marginLeft: '12px',
+              }}
+            >
+              <p style={{ color: 'rgba(245,196,0,0.8)', fontSize: '12px', fontWeight: 700, lineHeight: 1.5, marginBottom: '6px' }}>
+                {r.body}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(245,196,0,0.4)', fontSize: '10px', fontWeight: 700 }}>{r.time_ago}</span>
+                {!solved && (
+                  approveOpenId === r.id ? (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={approveEmail}
+                        onChange={(e) => setApproveEmail(e.target.value)}
+                        style={{ ...input, fontSize: '10px', padding: '5px 10px', width: '140px' }}
+                      />
+                      <button
+                        style={{ ...btn, padding: '4px 12px', fontSize: '10px' }}
+                        onClick={() => handleApprove(r.id)}
+                      >
+                        {approveStatus === 'loading' ? '…' : 'confirm'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button style={link} onClick={() => { setApproveOpenId(r.id); setApproveStatus('idle') }}>
+                      approve →
+                    </button>
+                  )
+                )}
+                {solved && r.is_approved && (
+                  <span style={{ color: '#F5C400', fontSize: '10px', fontWeight: 900 }}>✓ approved</span>
+                )}
+              </div>
+              {approveOpenId === r.id && approveStatus === 'error' && (
+                <p style={{ color: '#FF4040', fontSize: '10px', fontWeight: 700, marginTop: '6px' }}>{approveError}</p>
+              )}
+              {approveOpenId === r.id && approveStatus === 'done' && (
+                <p style={{ color: '#F5C400', fontSize: '10px', fontWeight: 900, marginTop: '6px' }}>done — check your email</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Home ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -369,7 +592,6 @@ export default function Home() {
       color: '#fff',
     }}>
 
-      {/* ── Header ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 20,
         background: 'rgba(0,0,0,0.92)',
@@ -405,7 +627,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ── Compose ── */}
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 8px' }}>
         <div style={{
           background: '#000',
@@ -498,7 +719,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Board ── */}
       <main style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px 60px' }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '72px 16px' }}>
@@ -515,9 +735,13 @@ export default function Home() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '20px',
           }}>
-            {messages.map((msg) => (
-              <Card key={msg.id} msg={msg} onPostFirst={scrollToCompose} />
-            ))}
+            {messages.map((msg) =>
+              msg.type === 'problem' ? (
+                <ProblemCard key={msg.id} msg={msg} />
+              ) : (
+                <Card key={msg.id} msg={msg} onPostFirst={scrollToCompose} />
+              )
+            )}
           </div>
         )}
       </main>
