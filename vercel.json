@@ -4,5 +4,8 @@
       "path": "/api/cron/expire",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "env": {
+    "TEST_MODE": "false"
+  }
 }

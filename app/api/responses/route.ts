@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cannot respond to your own problem' }, { status: 400 })
     }
 
-    // One response per email per problem — skipped in TEST_MODE
     if (!TEST_MODE) {
       const { data: existing } = await supabaseAdmin
         .from('responses')
@@ -88,7 +87,12 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
 
-    await supabaseAdmin.rpc('increment_response_count', { p_problem_id: problem_id })
+    const { error: rpcError } = await supabaseAdmin.rpc('increment_response_count', {
+      p_problem_id: problem_id,
+    })
+    if (rpcError) {
+      console.error('[abeille] increment_response_count failed:', rpcError.message)
+    }
 
     return NextResponse.json({ success: true, id: data.id })
   } catch (err: unknown) {

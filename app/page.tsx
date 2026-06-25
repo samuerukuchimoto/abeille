@@ -549,8 +549,9 @@ export default function Home() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          const newMsg = payload.new as Message
-          setMessages((prev) => [{ ...newMsg, time_ago: 'just now', fresh: true }, ...prev])
+          const { email: _e, embedding: _emb, ...safeMsg } = payload.new as Record<string, unknown>
+          const newMsg = { ...safeMsg, time_ago: 'just now', fresh: true } as Message
+          setMessages((prev) => [newMsg, ...prev])
         }
       )
       .subscribe()

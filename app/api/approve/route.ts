@@ -61,44 +61,40 @@ export async function POST(req: NextRequest) {
       .update({ is_solved: true, solved_at: new Date().toISOString() })
       .eq('id', problem.id)
 
-    try {
-      await sendEmail({
-        to: response.responder_email,
-        subject: 'Your response was chosen on Abeille',
-        text: [
-          'Someone accepted your response.',
-          '',
-          'The problem:',
-          problem.body,
-          '',
-          'Your response:',
-          response.body,
-          '',
-          'Their email:',
-          problem.email,
-          '',
-          "That's it. The rest is yours.",
-        ].join('\n'),
-      })
+    await sendEmail({
+      to: response.responder_email,
+      subject: 'Your response was chosen on Abeille',
+      text: [
+        'Someone accepted your response.',
+        '',
+        'The problem:',
+        problem.body,
+        '',
+        'Your response:',
+        response.body,
+        '',
+        'Their email:',
+        problem.email,
+        '',
+        "That's it. The rest is yours.",
+      ].join('\n'),
+    })
 
-      await sendEmail({
-        to: problem.email,
-        subject: 'You found your answer on Abeille',
-        text: [
-          'You approved a response to your problem.',
-          '',
-          'Their response:',
-          response.body,
-          '',
-          'Their email:',
-          response.responder_email,
-          '',
-          "That's it. The rest is yours.",
-        ].join('\n'),
-      })
-    } catch (emailErr) {
-      console.error('[abeille] approve email send failed (approval still stored):', emailErr)
-    }
+    await sendEmail({
+      to: problem.email,
+      subject: 'You found your answer on Abeille',
+      text: [
+        'You approved a response to your problem.',
+        '',
+        'Their response:',
+        response.body,
+        '',
+        'Their email:',
+        response.responder_email,
+        '',
+        "That's it. The rest is yours.",
+      ].join('\n'),
+    })
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

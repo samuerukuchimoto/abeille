@@ -1,40 +1,39 @@
 const TEST_MODE = process.env.TEST_MODE === 'true'
 
 export async function embed(text: string): Promise<number[]> {
-  // TEST_MODE: Groq nomic embedding requires verified access.
-  // Return a deterministic stub vector (768 dims) so posting works end-to-end.
-  // Cosine scores will be meaningless but the full flow is testable.
   if (TEST_MODE) {
     return Array.from({ length: 768 }, (_, i) =>
       Math.sin(i * 0.1 + text.charCodeAt(i % text.length || 0) * 0.01)
     )
   }
 
-  const res = await fetch('https://api.groq.com/openai/v1/embeddings', {
+  const res = await fetch('https://api-atlas.nomic.ai/v1/embedding/text', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      Authorization: `Bearer ${process.env.NOMIC_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       model: 'nomic-embed-text-v1.5',
-      input: text,
+      texts: [text],
+      task_type: 'search_document',
     }),
   })
 
   const data = await res.json()
 
   if (!res.ok) {
-    console.error('[abeille] Groq embed error:', res.status, JSON.stringify(data))
-    throw new Error(`Embedding failed: ${data?.error?.message ?? res.status}`)
+    console.error('[abeille] Nomic embed error:', res.status, JSON.stringify(data))
+    throw new Error(`Embedding failed: ${data?.message ?? res.status}`)
   }
 
-  if (!data.data?.[0]?.embedding) {
-    console.error('[abeille] Groq embed unexpected shape:', JSON.stringify(data))
+  const embedding = data.embeddings?.[0]
+  if (!embedding) {
+    console.error('[abeille] Nomic embed unexpected shape:', JSON.stringify(data))
     throw new Error('Embedding failed: unexpected response shape')
   }
 
-  return data.data[0].embedding
+  return embedding
 }
 
 export function cosineSim(a: number[], b: number[]): number {

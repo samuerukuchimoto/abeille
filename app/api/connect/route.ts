@@ -5,6 +5,10 @@ import { sendEmail } from '@/lib/email'
 
 const TEST_MODE = process.env.TEST_MODE === 'true'
 
+function toVectorString(arr: number[]): string {
+  return '[' + arr.join(',') + ']'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { requester_email, target_message_id } = await req.json()
@@ -18,8 +22,6 @@ export async function POST(req: NextRequest) {
 
     const normalEmail = requester_email.toLowerCase().trim()
 
-    // Rate limit: one connection per 24h per email
-    // Skipped in TEST_MODE so you can test repeatedly without waiting
     if (!TEST_MODE) {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const { data: recent } = await supabaseAdmin
@@ -37,10 +39,9 @@ export async function POST(req: NextRequest) {
         )
       }
     } else {
-      console.log('[abeille] TEST_MODE: skipping 24h connection rate limit for', normalEmail)
+      console.log('[abeille] TEST_MODE: skipping 24h rate limit for', normalEmail)
     }
 
-    // Fetch target message
     const { data: target } = await supabaseAdmin
       .from('messages')
       .select('id, email, body, type, embedding, is_active, expires_at')
@@ -51,12 +52,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message not found or expired' }, { status: 404 })
     }
 
-    // Block self-connection
     if (target.email === normalEmail) {
       return NextResponse.json({ error: 'Cannot connect to your own message' }, { status: 400 })
     }
 
-    // Fetch requester's active message
     const { data: requesterMsg } = await supabaseAdmin
       .from('messages')
       .select('id, body, type, embedding')
@@ -65,9 +64,6 @@ export async function POST(req: NextRequest) {
       .gt('expires_at', new Date().toISOString())
       .maybeSingle()
 
-    // If requester has no message:
-    // - Production: block and ask them to post first
-    // - TEST_MODE: proceed anyway so the email flow is testable
     if (!requesterMsg && !TEST_MODE) {
       await supabaseAdmin.from('connections').insert({
         requester_email: normalEmail,
@@ -88,7 +84,6 @@ export async function POST(req: NextRequest) {
       console.log('[abeille] TEST_MODE: requester has no active message, proceeding anyway')
     }
 
-    // Compute match score
     let finalScore: number
 
     if (requesterMsg?.embedding && target.embedding) {
@@ -96,13 +91,11 @@ export async function POST(req: NextRequest) {
       const bonus = requesterMsg.type !== target.type ? 0.08 : -0.05
       finalScore = score + bonus
     } else {
-      // No embeddings to compare (TEST_MODE with stub or no requester message)
       finalScore = 0.40
     }
 
     console.log('[abeille] match score:', finalScore, '| TEST_MODE:', TEST_MODE)
 
-    // Store connection attempt
     await supabaseAdmin.from('connections').insert({
       requester_email: normalEmail,
       requester_message_id: requesterMsg?.id ?? null,
@@ -111,31 +104,26 @@ export async function POST(req: NextRequest) {
       status: TEST_MODE || finalScore >= 0.52 ? 'accepted' : 'pending',
     })
 
-    // In TEST_MODE, always connect regardless of score
     if (TEST_MODE || finalScore >= 0.52) {
-      try {
-        await sendEmail({
-          to: target.email,
-          subject: 'Someone wants to connect on Abeille',
-          text: [
-            'Someone saw your message and wants to connect.',
-            '',
-            'Your message:',
-            target.body,
-            '',
-            'Their message:',
-            requesterMsg?.body ?? '(no message posted)',
-            '',
-            'Their email:',
-            normalEmail,
-            '',
-            "That's it. The rest is yours.",
-          ].join('\n'),
-        })
-        console.log('[abeille] connection email sent to:', target.email)
-      } catch (emailErr) {
-        console.error('[abeille] email send failed (connection still stored):', emailErr)
-      }
+      await sendEmail({
+        to: target.email,
+        subject: 'Someone wants to connect on Abeille',
+        text: [
+          'Someone saw your message and wants to connect.',
+          '',
+          'Your message:',
+          target.body,
+          '',
+          'Their message:',
+          requesterMsg?.body ?? '(no message posted)',
+          '',
+          'Their email:',
+          normalEmail,
+          '',
+          "That's it. The rest is yours.",
+        ].join('\n'),
+      })
+      console.log('[abeille] connection email sent to:', target.email)
 
       return NextResponse.json({
         outcome: 'connected',
@@ -143,9 +131,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // REDIRECTED — find 3 better matches using requester's embedding
+    // REDIRECTED — cast embedding to PG vector string for RPC
     const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
-      p_embedding: requesterMsg!.embedding,
+      p_embedding: toVectorString(requesterMsg!.embedding),
       p_type: requesterMsg!.type,
       p_exclude_id: target_message_id,
       p_limit: 3,
