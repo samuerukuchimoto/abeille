@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+  import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { embed } from '@/lib/embed'
+import { sendEmail } from '@/lib/email'
 
 function wordCount(s: string) {
   return s.trim() === '' ? 0 : s.trim().split(/\s+/).length
@@ -118,6 +119,20 @@ Output valid JSON only:
       .single()
 
     if (error) throw error
+
+    await sendEmail({
+      to: normalEmail,
+      subject: 'Your signal is live on Abeille',
+      text: [
+        'Your message is live for the next 24 hours.',
+        '',
+        body.trim(),
+        '',
+        'If someone connects or responds, we will email you.',
+        '',
+        'abeille.vercel.app',
+      ].join('\n'),
+    })
 
     return NextResponse.json({ success: true, id: data.id, type: data.type })
   } catch (err: unknown) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { sendEmail } from '@/lib/email'
 
 const TEST_MODE = process.env.TEST_MODE === 'true'
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const { data: problem } = await supabaseAdmin
       .from('messages')
-      .select('id, email, type, is_active, expires_at, is_solved')
+      .select('id, email, body, type, is_active, expires_at, is_solved')
       .eq('id', problem_id)
       .maybeSingle()
 
@@ -93,6 +94,22 @@ export async function POST(req: NextRequest) {
     if (rpcError) {
       console.error('[abeille] increment_response_count failed:', rpcError.message)
     }
+
+    await sendEmail({
+      to: problem.email,
+      subject: 'Someone responded to your problem on Abeille',
+      text: [
+        'Someone responded to your problem.',
+        '',
+        'Your problem:',
+        problem.body,
+        '',
+        'Their response:',
+        body.trim(),
+        '',
+        'Go to abeille.vercel.app to approve it and get their email.',
+      ].join('\n'),
+    })
 
     return NextResponse.json({ success: true, id: data.id })
   } catch (err: unknown) {
