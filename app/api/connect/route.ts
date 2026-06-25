@@ -9,6 +9,15 @@ function toVectorString(arr: number[]): string {
   return '[' + arr.join(',') + ']'
 }
 
+function parseEmbedding(e: unknown): number[] | null {
+  if (!e) return null
+  if (Array.isArray(e)) return e as number[]
+  if (typeof e === 'string') {
+    try { return JSON.parse(e) } catch { return null }
+  }
+  return null
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { requester_email, target_message_id } = await req.json()
@@ -84,15 +93,6 @@ export async function POST(req: NextRequest) {
       console.log('[abeille] TEST_MODE: requester has no active message, proceeding anyway')
     }
 
-    function parseEmbedding(e: unknown): number[] | null {
-      if (!e) return null
-      if (Array.isArray(e)) return e as number[]
-      if (typeof e === 'string') {
-        try { return JSON.parse(e) } catch { return null }
-      }
-      return null
-    }
-
     const aEmb = parseEmbedding(requesterMsg?.embedding)
     const bEmb = parseEmbedding(target.embedding)
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       const bonus = requesterMsg!.type !== target.type ? 0.08 : -0.05
       finalScore = score + bonus
     } else {
-    finalScore = 0.40
+      finalScore = 0.40
     }
 
     console.log('[abeille] match score:', finalScore, '| TEST_MODE:', TEST_MODE)
@@ -143,9 +143,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // REDIRECTED — cast embedding to PG vector string for RPC
     const { data: suggestions } = await supabaseAdmin.rpc('find_similar_messages', {
-      p_embedding: toVectorString(requesterMsg!.embedding),
+      p_embedding: toVectorString(aEmb ?? []),
       p_type: requesterMsg!.type,
       p_exclude_id: target_message_id,
       p_limit: 3,
